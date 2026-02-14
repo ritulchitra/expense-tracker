@@ -11,41 +11,56 @@ from app.models.co_space_member_model import CoSpaceMember
 
 
 # ============================================
-# Approve Expense (Financially Correct Version)
+# Approve Expense (Identity + Financial Safe)
 # ============================================
 
 def approve_expense(db: Session, expense_id, user_id):
 
     try:
 
+        # Ensure expense exists
+        expense = db.query(Expense).filter(
+            Expense.expense_id == expense_id
+        ).first()
+
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense not found")
+
+        if expense.expense_status != "pending":
+            raise HTTPException(
+                status_code=400,
+                detail="Expense is not pending approval"
+            )
+
+        # Ensure approval record exists for this user
         approval = db.query(ExpenseApproval).filter(
             ExpenseApproval.expense_id == expense_id,
             ExpenseApproval.user_id == user_id
         ).first()
 
         if not approval:
-            raise HTTPException(status_code=404, detail="Approval record not found")
+            raise HTTPException(
+                status_code=404,
+                detail="Approval record not found"
+            )
 
         if approval.expense_approval_status != "pending":
-            raise HTTPException(status_code=400, detail="Approval already processed")
+            raise HTTPException(
+                status_code=400,
+                detail="Approval already processed"
+            )
 
+        # Mark approval
         approval.expense_approval_status = "approved"
         approval.expense_approval_responded_at = datetime.utcnow()
 
-        # Check if any pending approvals remain
+        # Check if any approvals still pending
         pending = db.query(ExpenseApproval).filter(
             ExpenseApproval.expense_id == expense_id,
             ExpenseApproval.expense_approval_status == "pending"
         ).first()
 
         if not pending:
-
-            expense = db.query(Expense).filter(
-                Expense.expense_id == expense_id
-            ).first()
-
-            if not expense:
-                raise HTTPException(status_code=404, detail="Expense not found")
 
             # ============================================
             # PERSONAL FUND DEDUCTION
@@ -58,17 +73,23 @@ def approve_expense(db: Session, expense_id, user_id):
                 ).first()
 
                 if not fund:
-                    raise HTTPException(status_code=404, detail="User fund not found")
+                    raise HTTPException(
+                        status_code=404,
+                        detail="User fund not found"
+                    )
 
                 if fund.user_fund_remaining_amount < expense.expense_amount:
-                    raise HTTPException(status_code=400, detail="Insufficient personal funds")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Insufficient personal funds"
+                    )
 
                 fund.user_fund_remaining_amount -= expense.expense_amount
                 fund.user_fund_monthly_expense_total += expense.expense_amount
                 fund.user_fund_yearly_expense_total += expense.expense_amount
 
             # ============================================
-            # CO-SPACE FUND DEDUCTION (Controlled Rounding)
+            # CO-SPACE FUND DEDUCTION
             # ============================================
 
             elif expense.expense_from_fund_type == "co_space":
@@ -79,7 +100,10 @@ def approve_expense(db: Session, expense_id, user_id):
                 ).all()
 
                 if not members:
-                    raise HTTPException(status_code=400, detail="No accepted members in co-space")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="No accepted members in co-space"
+                    )
 
                 member_funds = []
                 total_pool_remaining = Decimal("0.00")
@@ -91,7 +115,10 @@ def approve_expense(db: Session, expense_id, user_id):
                     ).first()
 
                     if not fund:
-                        raise HTTPException(status_code=400, detail="Member fund not initialized")
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Member fund not initialized"
+                        )
 
                     total_pool_remaining += fund.co_space_fund_remaining_amount
                     member_funds.append(fund)
@@ -113,16 +140,15 @@ def approve_expense(db: Session, expense_id, user_id):
                 )
 
                 total_rounded = rounded_split * total_members
-
                 remainder = expense.expense_amount - total_rounded
 
-                # Deduct rounded split from all
+                # Deduct equal split (negative allowed)
                 for fund in member_funds:
                     fund.co_space_fund_remaining_amount -= rounded_split
                     fund.co_space_fund_monthly_expense_total += rounded_split
                     fund.co_space_fund_yearly_expense_total += rounded_split
 
-                # Adjust remainder to first member (to maintain exact total)
+                # Adjust remainder to first member to preserve exact total
                 if remainder != Decimal("0.00"):
                     member_funds[0].co_space_fund_remaining_amount -= remainder
                     member_funds[0].co_space_fund_monthly_expense_total += remainder
@@ -140,16 +166,32 @@ def approve_expense(db: Session, expense_id, user_id):
         raise
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Approval processing failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Approval processing failed"
+        )
 
 
 # ============================================
-# Reject Expense (Production Safe)
+# Reject Expense (Safe + Identity Enforced)
 # ============================================
 
 def reject_expense(db: Session, expense_id, user_id):
 
     try:
+
+        expense = db.query(Expense).filter(
+            Expense.expense_id == expense_id
+        ).first()
+
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense not found")
+
+        if expense.expense_status != "pending":
+            raise HTTPException(
+                status_code=400,
+                detail="Expense is not pending approval"
+            )
 
         approval = db.query(ExpenseApproval).filter(
             ExpenseApproval.expense_id == expense_id,
@@ -157,20 +199,21 @@ def reject_expense(db: Session, expense_id, user_id):
         ).first()
 
         if not approval:
-            raise HTTPException(status_code=404, detail="Approval record not found")
+            raise HTTPException(
+                status_code=404,
+                detail="Approval record not found"
+            )
 
         if approval.expense_approval_status != "pending":
-            raise HTTPException(status_code=400, detail="Approval already processed")
+            raise HTTPException(
+                status_code=400,
+                detail="Approval already processed"
+            )
 
         approval.expense_approval_status = "rejected"
         approval.expense_approval_responded_at = datetime.utcnow()
 
-        expense = db.query(Expense).filter(
-            Expense.expense_id == expense_id
-        ).first()
-
-        if expense:
-            expense.expense_status = "rejected"
+        expense.expense_status = "rejected"
 
         db.commit()
         db.refresh(approval)
@@ -182,11 +225,14 @@ def reject_expense(db: Session, expense_id, user_id):
         raise
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Rejection processing failed")
-    
+        raise HTTPException(
+            status_code=500,
+            detail="Rejection processing failed"
+        )
+
 
 # ============================================
-# Get Pending Approvals For User
+# Get Pending Approvals (Identity Enforced)
 # ============================================
 
 def get_pending_approvals(db: Session, user_id):
@@ -208,4 +254,3 @@ def get_pending_approvals(db: Session, user_id):
             pending_expenses.append(expense)
 
     return pending_expenses
-

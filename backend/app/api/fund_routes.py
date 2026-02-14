@@ -1,28 +1,56 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from uuid import UUID
 
 from app.core.database import get_db
-from app.schemas.fund_schema import (
-    UserFundCreate,
-    UserFundUpdate,
-    UserFundResponse
-)
+from app.core.dependencies import get_current_user
+from app.models.user_model import User
 from app.services import fund_service
+from app.schemas.fund_schema import UserFundCreate, UserFundResponse
 
-router = APIRouter(prefix="/users/{user_id}/fund", tags=["User Fund"])
-
-
-@router.get("", response_model=UserFundResponse)
-def get_fund(user_id: UUID, db: Session = Depends(get_db)):
-    return fund_service.get_user_fund(db, user_id)
+router = APIRouter(tags=["User Fund"])
 
 
-@router.post("", response_model=UserFundResponse)
-def initialize_fund(user_id: UUID, fund_data: UserFundCreate, db: Session = Depends(get_db)):
-    return fund_service.initialize_user_fund(db, user_id, fund_data)
+# ============================================
+# GET CURRENT USER FUND
+# ============================================
+
+@router.get("/users/me/fund", response_model=UserFundResponse)
+def get_my_fund(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return fund_service.get_user_fund(db, current_user.user_id)
 
 
-@router.put("", response_model=UserFundResponse)
-def update_fund(user_id: UUID, fund_data: UserFundUpdate, db: Session = Depends(get_db)):
-    return fund_service.update_user_fund(db, user_id, fund_data)
+# ============================================
+# INITIALIZE FUND
+# ============================================
+
+@router.post("/users/me/fund", response_model=UserFundResponse)
+def create_my_fund(
+    data: UserFundCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return fund_service.create_user_fund(
+        db,
+        current_user.user_id,
+        data
+    )
+
+
+# ============================================
+# UPDATE FUND
+# ============================================
+
+@router.put("/users/me/fund", response_model=UserFundResponse)
+def update_my_fund(
+    data: UserFundCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return fund_service.update_user_fund(
+        db,
+        current_user.user_id,
+        data
+    )

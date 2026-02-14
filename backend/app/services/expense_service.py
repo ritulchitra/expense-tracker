@@ -10,10 +10,10 @@ from decimal import Decimal
 
 
 # ============================================
-# Create Expense (Final Version)
+# Create Expense (Identity Enforced Version)
 # ============================================
 
-def create_expense(db: Session, data):
+def create_expense(db: Session, data, payer_user_id):
 
     try:
 
@@ -26,7 +26,7 @@ def create_expense(db: Session, data):
         if data.expense_from_fund_type == "personal":
 
             fund = db.query(UserFund).filter(
-                UserFund.user_id == data.expense_payer_user_id
+                UserFund.user_id == payer_user_id
             ).first()
 
             if not fund:
@@ -51,15 +51,31 @@ def create_expense(db: Session, data):
             if not data.co_space_id:
                 raise HTTPException(status_code=400, detail="Co-space ID required")
 
+            # 🔐 Enforce Membership
+            membership = db.query(CoSpaceMember).filter(
+                CoSpaceMember.co_space_id == data.co_space_id,
+                CoSpaceMember.user_id == payer_user_id,
+                CoSpaceMember.co_space_member_status == "accepted"
+            ).first()
+
+            if not membership:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not a member of this co-space"
+                )
+
             status = "pending"
 
         else:
             raise HTTPException(status_code=400, detail="Invalid fund type")
 
-        # Create expense record
+        # ============================================
+        # Create Expense Record
+        # ============================================
+
         expense = Expense(
             expense_id=expense_id,
-            expense_payer_user_id=data.expense_payer_user_id,
+            expense_payer_user_id=payer_user_id,
             co_space_id=data.co_space_id,
             expense_amount=data.expense_amount,
             expense_message=data.expense_message,
@@ -83,7 +99,7 @@ def create_expense(db: Session, data):
             ).all()
 
             for member in members:
-                if member.user_id != data.expense_payer_user_id:
+                if member.user_id != payer_user_id:
                     approval = ExpenseApproval(
                         expense_approval_id=uuid.uuid4(),
                         expense_id=expense_id,

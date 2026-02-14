@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Integer, Boolean, TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.core.database import Base
+from sqlalchemy import Column, String
 
 
 class User(Base):
@@ -15,3 +16,5 @@ class User(Base):
     user_is_active = Column(Boolean, default=True)
     user_created_at = Column(TIMESTAMP, server_default=func.now())
     user_updated_at = Column(TIMESTAMP, onupdate=func.now())
+    user_password = Column(String, nullable=False)
+
