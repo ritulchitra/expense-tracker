@@ -1,34 +1,32 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from app.api.user_routes import router as user_router
+from app.api.fund_routes import router as fund_router
+from app.api.co_space_routes import router as co_space_router
+from app.api.expense_routes import router as expense_router
+from app.api.approval_routes import router as approval_router
+from app.api.dashboard_routes import router as dashboard_router
 
-from app.routers import users, projects, pending_expenses, expense_approvals,finalize_expenses,project_fund, balances
+
+
+
 
 app = FastAPI(
-    title="Expense Tracker API",
-    version="0.1.0"
+    title="Collaborative Fund-Based Expense Management System",
+    description="Backend APIs with Approval Workflow & AI Integration",
+    version="1.0.0"
 )
 
-# routers
-app.include_router(users.router)
-app.include_router(projects.router)
-app.include_router(pending_expenses.router)
-app.include_router(expense_approvals.router)
-app.include_router(finalize_expenses.router)
-app.include_router(project_fund.router)
-app.include_router(balances.router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # dev only
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.include_router(user_router)
+app.include_router(fund_router)
+app.include_router(co_space_router)
+app.include_router(expense_router)
+app.include_router(approval_router)
+app.include_router(dashboard_router)
 
 
-@app.get("/health")
-def health_check():
+
+@app.get("/")
+def root():
     return {
-        "status": "ok",
-        "service": "expense-tracker-backend"
+        "message": "Collaborative Fund-Based Expense Management System Running"
     }
