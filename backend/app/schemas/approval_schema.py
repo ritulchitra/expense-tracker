@@ -1,15 +1,28 @@
 from pydantic import BaseModel
 from uuid import UUID
-
-
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
 
-class ApprovalAction(BaseModel):
-    user_id: UUID
+# ============================================
+# Approval Response (Approve / Reject)
+# ============================================
 
+class ExpenseApprovalResponse(BaseModel):
+    expense_approval_id: UUID
+    expense_id: UUID
+    user_id: UUID
+    expense_approval_status: str
+    expense_approval_responded_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# Pending Approval Listing
+# ============================================
 
 class PendingApprovalResponse(BaseModel):
     expense_id: UUID

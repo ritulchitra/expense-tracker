@@ -5,7 +5,6 @@ from typing import Optional
 
 
 class ExpenseCreate(BaseModel):
-    expense_payer_user_id: UUID
     co_space_id: Optional[UUID] = None
     expense_amount: Decimal
     expense_message: Optional[str] = None

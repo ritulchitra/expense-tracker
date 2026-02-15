@@ -5,9 +5,7 @@ from app.api.co_space_routes import router as co_space_router
 from app.api.expense_routes import router as expense_router
 from app.api.approval_routes import router as approval_router
 from app.api.dashboard_routes import router as dashboard_router
-
-
-
+from app.api.auth_routes import router as auth_router
 
 
 app = FastAPI(
@@ -16,6 +14,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(fund_router)
 app.include_router(co_space_router)
